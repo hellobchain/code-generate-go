@@ -18,9 +18,10 @@ import (
 )
 
 var (
-	mysqlDsn = flag.String("dns", "root:123456@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local", "")
-	outPath  = flag.String("out", "../demo", "生成代码目录")
-	module   = flag.String("mod", "github.com/demo", "go module 名")
+	mysqlDsn      = flag.String("dns", "root:123456@tcp(127.0.0.1:3306)/test?charset=utf8mb4&parseTime=True&loc=Local", "")
+	outPath       = flag.String("out", "../demo", "生成代码目录")
+	module        = flag.String("mod", "github.com/demo", "go module 名")
+	baseErrorCode = flag.Int("bec", 110300, "")
 )
 
 // ---------- 表/列元数据结构 ----------
@@ -32,9 +33,11 @@ type Column struct {
 }
 
 type Table struct {
-	TableName string
-	GoName    string
-	Columns   []Column
+	TableName     string
+	GoName        string
+	UpperGoName   string
+	BaseErrorCode int
+	Columns       []Column
 }
 
 // ---------- 主入口 ----------
@@ -58,13 +61,18 @@ func loadTables() (*gorm.DB, []Table) {
 
 	// 3. 逐个表解析
 	var tables []Table
+	baseErrorCode := *baseErrorCode
 	for _, tn := range tableNames {
 		cols := loadColumns(db, dbName, tn)
+		goName := toGoName(tn)
 		tables = append(tables, Table{
-			TableName: tn,
-			GoName:    toGoName(tn),
-			Columns:   cols,
+			TableName:     tn,
+			GoName:        goName,
+			UpperGoName:   strings.ToUpper(tn),
+			Columns:       cols,
+			BaseErrorCode: baseErrorCode,
 		})
+		baseErrorCode += 100
 	}
 	return db, tables
 }
@@ -163,12 +171,19 @@ func main() {
 	apiTpl := parseTemplate(tplFS, "api.tpl")
 	mainTpl := parseTemplate(tplFS, "main.tpl")
 	docsTpl := parseTemplate(tplFS, "docs.tpl")
-
+	// code
+	codeTpl := parseTemplate(tplFS, "code.tpl")
+	// error
+	errorTpl := parseTemplate(tplFS, "error.tpl")
+	// msg
+	msgTpl := parseTemplate(tplFS, "msg.tpl")
+	// result
+	resultTpl := parseTemplate(tplFS, "result.tpl")
 	// 2. 连接数据库、解析表结构（与旧代码完全一致，省略）
 	_, tables := loadTables()
 
 	// 3. 创建目录
-	for _, dir := range []string{"model", "dao", "api", "docs"} {
+	for _, dir := range []string{"model", "dao", "api", "docs", "e", "gintool"} {
 		_ = os.MkdirAll(filepath.Join(*outPath, dir), 0755)
 	}
 
@@ -186,6 +201,10 @@ func main() {
 
 	// 5. 生成swagger docs.go
 	writeTemplate(docsTpl, nil, filepath.Join(*outPath, "docs", "docs.go"))
+	writeTemplate(codeTpl, map[string]interface{}{"Tables": tables}, filepath.Join(*outPath, "e", "code.go"))
+	writeTemplate(errorTpl, nil, filepath.Join(*outPath, "e", "error.go"))
+	writeTemplate(msgTpl, map[string]interface{}{"Tables": tables}, filepath.Join(*outPath, "e", "msg.go"))
+	writeTemplate(resultTpl, map[string]interface{}{"Mod": *module}, filepath.Join(*outPath, "gintool", "result.go"))
 
 	// 6. 生成 main.go
 	writeTemplate(mainTpl, map[string]interface{}{

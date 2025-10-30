@@ -1,12 +1,12 @@
 package api
 
 import (
-	"net/http"
 	"strconv"
-
+	"{{.Mod}}/e"
 	"github.com/gin-gonic/gin"
 	"{{.Mod}}/dao"
 	"{{.Mod}}/model"
+	"{{.Mod}}/gintool"
 )
 
 type {{.Table.GoName}}Api struct{ d *dao.{{.Table.GoName}}Dao }
@@ -28,19 +28,20 @@ func (a *{{.Table.GoName}}Api) Register(r *gin.RouterGroup) {
 // @Accept   json
 // @Produce  json
 // @Param    body  body     model.{{.Table.GoName}}  true  "实体"
-// @Success  200   {object} model.{{.Table.GoName}}
+// @Success 200 {object} gintool.ApiResponse{result=model.{{.Table.GoName}}}
+// @Failure 400 {object} gintool.ApiResponse
 // @Router   /api/{{.Table.TableName}} [post]
 func (a *{{.Table.GoName}}Api) Create(c *gin.Context) {
 	var m model.{{.Table.GoName}}
 	if err := c.ShouldBindJSON(&m); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"err": err.Error()})
+		gintool.ResultCodeWithData(c, e.NewError(e.INVALID_PARAMS, err), nil)
 		return
 	}
 	if err := a.d.Create(&m); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"err": err.Error()})
+		gintool.ResultCodeWithData(c, e.NewError(e.ERROR_CREATE_{{.Table.UpperGoName}}_FAIL, err), nil)
 		return
 	}
-	c.JSON(http.StatusOK, m)
+	gintool.ResultCodeWithData(c, nil, m)
 }
 
 // Get
@@ -48,16 +49,17 @@ func (a *{{.Table.GoName}}Api) Create(c *gin.Context) {
 // @Tags     {{.Table.TableName}}
 // @Produce  json
 // @Param    id  path  int  true  "主键"
-// @Success  200  {object} model.{{.Table.GoName}}
+// @Success 200 {object} gintool.ApiResponse{result=model.{{.Table.GoName}}}
+// @Failure 400 {object} gintool.ApiResponse
 // @Router   /api/{{.Table.TableName}}/{id} [get]
 func (a *{{.Table.GoName}}Api) Get(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	m, err := a.d.Get(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"err": err.Error()})
+		gintool.ResultCodeWithData(c, e.NewError(e.ERROR_GET_{{.Table.UpperGoName}}_FAIL, err), nil)
 		return
 	}
-	c.JSON(http.StatusOK, m)
+	gintool.ResultCodeWithData(c, nil, m)
 }
 
 // Update
@@ -67,21 +69,22 @@ func (a *{{.Table.GoName}}Api) Get(c *gin.Context) {
 // @Produce  json
 // @Param    id    path  int              true  "主键"
 // @Param    body  body  model.{{.Table.GoName}}  true  "实体"
-// @Success  200  {object} model.{{.Table.GoName}}
+// @Success 200 {object} gintool.ApiResponse{result=model.{{.Table.GoName}}}
+// @Failure 400 {object} gintool.ApiResponse
 // @Router   /api/{{.Table.TableName}}/{id} [put]
 func (a *{{.Table.GoName}}Api) Update(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	var m model.{{.Table.GoName}}
 	if err := c.ShouldBindJSON(&m); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"err": err.Error()})
+		gintool.ResultCodeWithData(c, e.NewError(e.INVALID_PARAMS, err), nil)
 		return
 	}
 	m.Id = int64(id)
 	if err := a.d.Update(&m); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"err": err.Error()})
+		gintool.ResultCodeWithData(c, e.NewError(e.ERROR_UPDATE_{{.Table.UpperGoName}}_FAIL, err), nil)
 		return
 	}
-	c.JSON(http.StatusOK, m)
+	gintool.ResultCodeWithData(c, nil, m)
 }
 
 // Delete
@@ -89,28 +92,30 @@ func (a *{{.Table.GoName}}Api) Update(c *gin.Context) {
 // @Tags     {{.Table.TableName}}
 // @Produce  json
 // @Param    id  path  int  true  "主键"
-// @Success  200  {object} model.{{.Table.GoName}}
+// @Success 200 {object} gintool.ApiResponse{result=model.{{.Table.GoName}}}
+// @Failure 400 {object} gintool.ApiResponse
 // @Router   /api/{{.Table.TableName}}/{id} [delete]
 func (a *{{.Table.GoName}}Api) Delete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	if err := a.d.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"err": err.Error()})
+		gintool.ResultCodeWithData(c, e.NewError(e.ERROR_DELETE_{{.Table.UpperGoName}}_FAIL, err), nil)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"msg": "ok"})
+	gintool.ResultCodeWithData(c, nil, nil)
 }
 
 // List
 // @Summary  获取{{.Table.GoName}}列表
 // @Tags     {{.Table.TableName}}
 // @Produce  json
-// @Success  200  {array} model.{{.Table.GoName}}
+// @Success 200 {object} gintool.ApiResponse{result=model.{{.Table.GoName}}}
+// @Failure 400 {object} gintool.ApiResponse
 // @Router   /api/{{.Table.TableName}} [get]
 func (a *{{.Table.GoName}}Api) List(c *gin.Context) {
 	list, err := a.d.List()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"err": err.Error()})
+		gintool.ResultCodeWithData(c, e.NewError(e.ERROR_LIST_{{.Table.UpperGoName}}_FAIL, err), nil)
 		return
 	}
-	c.JSON(http.StatusOK, list)
+	gintool.ResultCodeWithData(c, nil, list)
 }
