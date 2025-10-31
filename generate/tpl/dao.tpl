@@ -1,7 +1,7 @@
 package dao
 
 import (
-	"gorm.io/gorm"
+	"github.com/jinzhu/gorm"
 	"{{.Mod}}/model"
 )
 

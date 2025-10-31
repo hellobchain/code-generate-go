@@ -7,11 +7,13 @@ import (
 	"{{.Mod}}/model"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swaggo/gin-swagger"
-	"github.com/swaggo/files"
 	_ "{{.Mod}}/docs"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
+	"github.com/jinzhu/gorm"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	// 必须要添加，解决找不到mysql驱动问题
+	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
 
 // @title     自动生成接口文档
@@ -20,7 +22,7 @@ import (
 // @BasePath  /
 func main() {
 	dsn := "{{.Dsn}}"
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open("mysql", dsn)
 	if err != nil { log.Fatal(err) }
 	{{- range .Tables }}
 	db.AutoMigrate(&model.{{.GoName}}{})

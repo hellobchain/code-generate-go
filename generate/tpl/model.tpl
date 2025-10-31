@@ -1,7 +1,9 @@
 package model
 
 import (
-	"time"
+	{{- range .DaoImports }}
+	"{{.}}"
+	{{- end }}
 )
 
 type {{.GoName}} struct {
