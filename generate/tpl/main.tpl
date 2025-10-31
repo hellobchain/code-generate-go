@@ -39,7 +39,7 @@ func main() {
 		db.SetLogger(NewSqlLogger(logger))
 	}
 	{{- range .Tables }}
-	db.AutoMigrate(&model.{{.GoName}}{})
+	AutoMigrate{{.GoName}}Table(db)
 	{{- end }}
 
 	r := gin.New()
@@ -49,8 +49,7 @@ func main() {
 
 	apiGroup := r.Group("/api")
 	{{- range .Tables }}
-	{{lower .GoName}}API := api.New{{.GoName}}Api(dao.New{{.GoName}}Dao(db))
-	{{lower .GoName}}API.Register(apiGroup)
+	Register{{.GoName}}Api(apiGroup,db)
 	{{- end }}
 
 	r.Run(":8080")
@@ -67,3 +66,14 @@ func (l *sqlLogger) Print(v ...interface{}) {
 func NewSqlLogger(logger *wlogging.WswLogger) *sqlLogger {
 	return &sqlLogger{logger: logger}
 }
+
+{{- range .Tables }}
+func AutoMigrate{{.GoName}}Table(db *gorm.DB) {
+	db.AutoMigrate(&model.{{.GoName}}{})
+}
+
+func Register{{.GoName}}Api(apiGroup *gin.RouterGroup,db *gorm.DB) { 
+	{{lower .GoName}}API := api.New{{.GoName}}Api(dao.New{{.GoName}}Dao(db))
+	{{lower .GoName}}API.Register(apiGroup)
+}
+{{- end }}
