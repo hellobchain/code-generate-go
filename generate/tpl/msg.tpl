@@ -1,6 +1,12 @@
 package e
 
 var msgFlags = map[ErrCode][]string{
+	// 通用错误
+	SUCCESS:        {"请求成功", "request success"},
+	INVALID_PARAMS: {"请求参数错误", "invalid params"},
+	ERROR:          {"请求失败", "request fail"},
+	UNKNOWN_ERROR:  {"未知错误", "unknown error"},
+	
 	{{- range .Tables }}
 	// {{.GoName}}
 	ERROR_CREATE_{{.UpperGoName}}_FAIL: {"创建{{.GoName}}失败", "create {{.GoName}} fail"}, // 创建{{.GoName}}失败

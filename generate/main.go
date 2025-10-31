@@ -42,6 +42,8 @@ func main() {
 	msgTpl := parseTemplate(tplFS, "msg.tpl")
 	// result
 	resultTpl := parseTemplate(tplFS, "result.tpl")
+	// ginlog
+	ginlogTpl := parseTemplate(tplFS, "ginlog.tpl")
 
 	// 2. 连接数据库、解析表结构
 	_, tables := loadTables()
@@ -69,6 +71,7 @@ func main() {
 	writeTemplate(errorTpl, nil, filepath.Join(*outPath, "e", "error.go"))
 	writeTemplate(msgTpl, map[string]interface{}{"Tables": tables}, filepath.Join(*outPath, "e", "msg.go"))
 	writeTemplate(resultTpl, map[string]interface{}{"Mod": *module}, filepath.Join(*outPath, "gintool", "result.go"))
+	writeTemplate(ginlogTpl, nil, filepath.Join(*outPath, "gintool", "ginlog.go"))
 
 	// 6. 生成 main.go
 	writeTemplate(mainTpl, map[string]interface{}{
