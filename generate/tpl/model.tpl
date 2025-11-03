@@ -1,15 +1,16 @@
 package model
 
 import (
-	{{- range .DaoImports }}
+	"{{.Mod}}/constants"
+	{{- range .Table.DaoImports }}
 	"{{.}}"
 	{{- end }}
 )
 
-type {{.GoName}} struct {
-	{{- range .Columns }}
+type {{.Table.GoName}} struct {
+	{{- range .Table.Columns }}
 	{{.GoName}} {{.GoType}} `gorm:"{{.Tag}}" json:"{{.GoTag}}"`    // {{.Comment}}
 	{{- end }}
 }
 
-func ({{.GoName}}) TableName() string { return "{{.TableName}}" }
+func ({{.Table.GoName}}) TableName() string { return constants.Table{{.Table.UpperTableName}} }

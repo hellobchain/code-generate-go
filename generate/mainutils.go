@@ -25,12 +25,13 @@ type Column struct {
 }
 
 type Table struct {
-	TableName     string
-	GoName        string
-	UpperGoName   string
-	BaseErrorCode int
-	Columns       []Column
-	DaoImports    []string // dao 层导入依赖包
+	TableName      string
+	UpperTableName string
+	GoName         string
+	UpperGoName    string
+	BaseErrorCode  int
+	Columns        []Column
+	DaoImports     []string // dao 层导入依赖包
 }
 
 // ---------- 主入口 ----------
@@ -59,54 +60,27 @@ func loadTables() (*gorm.DB, []Table) {
 		cols, daoImports := loadColumnsWithIndex(db, dbName, tn)
 		goName := toGoName(tn)
 		tables = append(tables, Table{
-			TableName:     tn,
-			GoName:        goName,
-			UpperGoName:   strings.ToUpper(tn),
-			Columns:       cols,
-			BaseErrorCode: baseErrorCode,
-			DaoImports:    daoImports,
+			TableName:      tn,
+			UpperTableName: toUpperS(tn),
+			GoName:         goName,
+			UpperGoName:    strings.ToUpper(tn),
+			Columns:        cols,
+			BaseErrorCode:  baseErrorCode,
+			DaoImports:     daoImports,
 		})
 		baseErrorCode += 100
 	}
 	return db, tables
 }
 
-// ---------- 列级解析 ----------
-func loadColumns(db *gorm.DB, dbName, tableName string) ([]Column, []string) {
-	// 查询列信息
-	var raw []struct {
-		ColumnName    string `gorm:"column:COLUMN_NAME"`
-		DataType      string `gorm:"column:DATA_TYPE"`
-		IsNullable    string `gorm:"column:IS_NULLABLE"`
-		ColumnKey     string `gorm:"column:COLUMN_KEY"`
-		ColumnType    string `gorm:"column:COLUMN_TYPE"` // int(11) / decimal(10,2)
-		ColumnComment string `gorm:"column:COLUMN_COMMENT"`
+// 首字母大写
+func toUpperS(tableName string) string {
+	// 去掉_ 每个字的首字母大写
+	s := strings.Split(tableName, "_")
+	for i := range s {
+		s[i] = strings.ToUpper(s[i][:1]) + s[i][1:]
 	}
-	db.Raw(`SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY, COLUMN_TYPE, COLUMN_COMMENT
-	          FROM information_schema.columns
-	          WHERE table_schema = ?
-	            AND table_name = ?
-	          ORDER BY ordinal_position`, dbName, tableName).Scan(&raw)
-
-	var cols []Column
-	var daoImports []string
-	for _, r := range raw {
-		goType := mysqlToGoType(r.DataType, r.ColumnType, r.IsNullable == "YES")
-		tag := buildGormTag(r.ColumnName, r.ColumnKey)
-		cols = append(cols, Column{
-			GoName: toGoName(r.ColumnName),
-			GoType: goType,
-			Tag:    tag,
-			GoTag:  r.ColumnName,
-		})
-		if strings.Contains(goType, "datatypes.JSON") {
-			daoImports = append(daoImports, "gorm.io/datatypes")
-		}
-		if strings.Contains(goType, "time.Time") {
-			daoImports = append(daoImports, "time")
-		}
-	}
-	return cols, daoImports
+	return strings.Join(s, "")
 }
 
 func loadColumnsWithIndex(db *gorm.DB, dbName, tableName string) ([]Column, []string) {

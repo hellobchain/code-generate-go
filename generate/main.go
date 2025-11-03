@@ -44,27 +44,31 @@ func main() {
 	resultTpl := parseTemplate(tplFS, "result.tpl")
 	// ginlog
 	ginlogTpl := parseTemplate(tplFS, "ginlog.tpl")
+	// tables
+	tablesTpl := parseTemplate(tplFS, "tables.tpl")
 
 	// 2. 连接数据库、解析表结构
 	_, tables := loadTables()
 
 	// 3. 创建目录
-	for _, dir := range []string{"model", "dao", "api", "docs", "e", "gintool"} {
+	for _, dir := range []string{"model", "dao", "api", "docs", "e", "gintool", "constants"} {
 		_ = os.MkdirAll(filepath.Join(*outPath, dir), 0755)
 	}
 
 	// 4. 生成代码
 	for _, t := range tables {
 		// model
-		writeTemplate(modelTpl, t, filepath.Join(*outPath, "model", t.TableName+".go"))
+		writeTemplate(modelTpl, map[string]interface{}{"Table": t, "Mod": *module}, filepath.Join(*outPath, "model", t.TableName+".go"))
 		// dao
 		writeTemplate(daoTpl, map[string]interface{}{"Table": t, "Mod": *module},
 			filepath.Join(*outPath, "dao", t.TableName+".go"))
 		// api
 		writeTemplate(apiTpl, map[string]interface{}{"Table": t, "Mod": *module},
 			filepath.Join(*outPath, "api", t.TableName+".go"))
-	}
 
+	}
+	// tables
+	writeTemplate(tablesTpl, map[string]interface{}{"Tables": tables}, filepath.Join(*outPath, "constants", "tables.go"))
 	// 5. 生成swagger docs.go
 	writeTemplate(docsTpl, nil, filepath.Join(*outPath, "docs", "docs.go"))
 	writeTemplate(codeTpl, map[string]interface{}{"Tables": tables}, filepath.Join(*outPath, "e", "code.go"))
