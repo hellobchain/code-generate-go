@@ -8,7 +8,7 @@ import (
 
 type {{.GoName}} struct {
 	{{- range .Columns }}
-	{{.GoName}} {{.GoType}} `gorm:"{{.Tag}}" json:"{{.GoTag}}"`
+	{{.GoName}} {{.GoType}} `gorm:"{{.Tag}}" json:"{{.GoTag}}"`    // {{.Comment}}
 	{{- end }}
 }
 

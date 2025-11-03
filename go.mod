@@ -1,6 +1,6 @@
 module github.com/hellobchain/code-generate-go
 
-go 1.24.0
+go 1.25.0
 
 require (
 	gorm.io/driver/mysql v1.6.0

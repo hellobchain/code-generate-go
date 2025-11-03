@@ -17,10 +17,11 @@ import (
 
 // ---------- 表/列元数据结构 ----------
 type Column struct {
-	GoName string // 结构体字段名
-	GoType string // go 类型
-	Tag    string // gorm tag
-	GoTag  string // go tag
+	GoName  string // 结构体字段名
+	GoType  string // go 类型
+	Tag     string // gorm tag
+	GoTag   string // go tag
+	Comment string // 列注释
 }
 
 type Table struct {
@@ -55,7 +56,7 @@ func loadTables() (*gorm.DB, []Table) {
 	var tables []Table
 	baseErrorCode := *baseErrorCode
 	for _, tn := range tableNames {
-		cols, daoImports := loadColumns(db, dbName, tn)
+		cols, daoImports := loadColumnsWithIndex(db, dbName, tn)
 		goName := toGoName(tn)
 		tables = append(tables, Table{
 			TableName:     tn,
@@ -78,8 +79,8 @@ func loadColumns(db *gorm.DB, dbName, tableName string) ([]Column, []string) {
 		DataType      string `gorm:"column:DATA_TYPE"`
 		IsNullable    string `gorm:"column:IS_NULLABLE"`
 		ColumnKey     string `gorm:"column:COLUMN_KEY"`
-		ColumnType    string `gorm:"column:COLUMN_TYPE"`    // int(11) / decimal(10,2)
-		ColumnComment string `gorm:"column:COLUMN_COMMENT"` // 可后续生成字段注释
+		ColumnType    string `gorm:"column:COLUMN_TYPE"` // int(11) / decimal(10,2)
+		ColumnComment string `gorm:"column:COLUMN_COMMENT"`
 	}
 	db.Raw(`SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY, COLUMN_TYPE, COLUMN_COMMENT
 	          FROM information_schema.columns
@@ -106,6 +107,95 @@ func loadColumns(db *gorm.DB, dbName, tableName string) ([]Column, []string) {
 		}
 	}
 	return cols, daoImports
+}
+
+func loadColumnsWithIndex(db *gorm.DB, dbName, tableName string) ([]Column, []string) {
+	// 1. 列信息
+	var cols []struct {
+		ColumnName    string `gorm:"column:COLUMN_NAME"`
+		DataType      string `gorm:"column:DATA_TYPE"`
+		ColumnType    string `gorm:"column:COLUMN_TYPE"`
+		IsNullable    string `gorm:"column:IS_NULLABLE"`
+		ColumnKey     string `gorm:"column:COLUMN_KEY"`
+		ColumnComment string `gorm:"column:COLUMN_COMMENT"`
+	}
+	db.Raw(`SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, COLUMN_KEY, COLUMN_COMMENT
+	          FROM information_schema.columns
+	          WHERE table_schema = ? AND table_name = ?
+	          ORDER BY ordinal_position`, dbName, tableName).Scan(&cols)
+
+	// 2. 索引信息
+	idxMap := make(map[string]map[string]int) // idxName -> columnName -> seqInIndex
+	var idxRows []struct {
+		IndexName  string `gorm:"column:INDEX_NAME"`
+		NonUnique  int    `gorm:"column:NON_UNIQUE"` // 1=普通 0=唯一
+		ColumnName string `gorm:"column:COLUMN_NAME"`
+		SeqInIndex int    `gorm:"column:SEQ_IN_INDEX"`
+	}
+	db.Raw(`SELECT INDEX_NAME, NON_UNIQUE, COLUMN_NAME, SEQ_IN_INDEX
+	          FROM information_schema.STATISTICS
+	          WHERE table_schema = ? AND table_name = ?
+	            AND INDEX_NAME != 'PRIMARY'
+	          ORDER BY INDEX_NAME, SEQ_IN_INDEX`, dbName, tableName).Scan(&idxRows)
+	for _, r := range idxRows {
+		if _, ok := idxMap[r.IndexName]; !ok {
+			idxMap[r.IndexName] = make(map[string]int)
+		}
+		idxMap[r.IndexName][r.ColumnName] = r.SeqInIndex
+	}
+
+	// 3. 生成 Column
+	var result []Column
+	var daoImports []string
+	for _, c := range cols {
+		tagParts := []string{fmt.Sprintf(`column:%s`, c.ColumnName)}
+		if c.ColumnKey == "PRI" {
+			tagParts = append(tagParts, "primaryKey")
+		}
+
+		// 把涉及本列的所有索引写进 tag
+		for idxName, colSeq := range idxMap {
+			if _, hit := colSeq[c.ColumnName]; hit {
+				if len(colSeq) == 1 {
+					// 单列索引
+					if colSeq[c.ColumnName] == 1 {
+						unique := "index"
+						if isUnique := db.Raw(`SELECT NON_UNIQUE FROM information_schema.STATISTICS WHERE table_schema = ? AND table_name = ? AND INDEX_NAME = ? LIMIT 1`, dbName, tableName, idxName).RowsAffected; isUnique == 0 {
+							tagParts = append(tagParts, "unique")
+						} else {
+							tagParts = append(tagParts, fmt.Sprintf(`%s:%s`, unique, idxName))
+						}
+					}
+				} else {
+					// 组合索引
+					if colSeq[c.ColumnName] == 1 {
+						tagParts = append(tagParts, fmt.Sprintf(`index:%s`, idxName))
+					} else {
+						// 列索引
+						tagParts = append(tagParts, fmt.Sprintf(`index:%s`, idxName))
+					}
+				}
+			}
+		}
+		if c.ColumnComment != "" {
+			tagParts = append(tagParts, "comment:'"+c.ColumnComment+"'")
+		}
+		goType := mysqlToGoType(c.DataType, c.ColumnType, c.IsNullable == "YES")
+		result = append(result, Column{
+			GoName:  toGoName(c.ColumnName),
+			GoType:  goType,
+			Tag:     strings.Join(tagParts, ";"),
+			Comment: c.ColumnComment,
+			GoTag:   c.ColumnName,
+		})
+		if strings.Contains(goType, "datatypes.JSON") {
+			daoImports = append(daoImports, "gorm.io/datatypes")
+		}
+		if strings.Contains(goType, "time.Time") {
+			daoImports = append(daoImports, "time")
+		}
+	}
+	return result, daoImports
 }
 
 // ---------- 类型映射 ----------
